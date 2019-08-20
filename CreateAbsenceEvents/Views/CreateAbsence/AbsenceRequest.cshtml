@@ -1,0 +1,105 @@
+﻿@model CreateAbsenceEvents.Models.AbsenceRequestDTO
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, AuthoringTagHelpers
+
+@*@{
+    Layout = null;
+}*@
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>AbsenceRequest</title>
+    <link href="~/css/CreateAbsence.css" rel="stylesheet" />
+</head>
+
+<body>
+
+    <div class="login">
+        <h4>Create Absences Requests</h4>
+        <form asp-action="Create" method="post" onsubmit="btnSubmit.disabled = true; return true;">
+            @*<input type="text" name="u" placeholder="Username" required="required" />
+            <input type="password" name="p" placeholder="Password" required="required" />*@
+            <select asp-for="Envoirment" asp-items="Model.Environments" width="100%"></select>
+            <input asp-for="OrgId" placeholder="Organization ID" required="required" />
+            <input asp-for="LoginId" placeholder="Login ID" required="required" />
+            <input asp-for="Pin" placeholder="PIN" required="required" />
+            <input asp-for="WorkerId" placeholder="Worker ID" required="required" />
+            <input asp-for="NoOfAbsences" placeholder="No of Absences" required="required" />
+            <input asp-for="StartDt" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control " />
+
+            @if (Model.Processing)
+            {
+                <button type="submit" disabled name="btnSubmit" id="btnSubmit" class="btn btn-primary btn-block btn-large btn-disabled">Create</button>
+            }
+            else
+            {
+                <button type="submit" name="btnSubmit" id="btnSubmit" class="btn btn-primary btn-block btn-large">Create</button>
+            }
+        </form>
+        </br>
+        <div id="status" style="visibility:visible">
+            <div style="position:relative;width:300px" ;background:#f0f0f0">
+                <div id="progress" style="background: #ff0000; height: 20px;width:0;"></div>
+            </div>
+            <p><label>Processing : <span id="job-status">...</span></label></p>
+        </div>
+    </div>
+
+    @section Scripts
+        {
+        @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+        <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+        <script>
+        var connection = new signalR.HubConnectionBuilder()
+            .withUrl("/jobProgressHub")
+            .configureLogging(signalR.LogLevel.Information)
+            .build();
+            connection.on("progress",
+                (percent, completed) => {
+                    var jobStatus = document.getElementById("job-status");
+                    if (completed) {
+                        if (percent === @Model.NoOfAbsences) {
+                            jobStatus.innerText = "Done!";
+                        }
+                        else {
+                            jobStatus.innerText = "Only " + percent + "/" +  @Model.NoOfAbsences + " created";
+                        }
+                        document.getElementById("btnSubmit").disabled = false;
+                        document.getElementById("btnSubmit").classList.remove("btn-disabled");
+                        var status = document.getElementById('status');
+                        status.style.visibility = 'visible';
+                        var stDate = document.getElementById('StartDt').value;
+                        var stDateNew = new Date(Date.parse(stDate));
+                        stDateNew.setDate(stDateNew.getDate() + percent);
+                        console.log(stDateNew);
+                        var newformattedDate = (('0' + (stDateNew.getMonth() + 1)).slice(-2) + '-'
+                            + '0' + stDateNew.getDate()).slice(-2)  + '-'
+                            + stDateNew.getFullYear();
+                        newformattedDate = stDateNew.toISOString().slice(0, 10);
+                        console.log(newformattedDate);
+                        document.getElementById('StartDt').value = newformattedDate;
+                        
+                            
+                }
+                    else {
+                        if (percent == 1) {
+                            var status = document.getElementById('status');
+                            status.style.visibility = 'visible';
+                        }
+                        var progressEle = $("#progress");
+                        var total= @Model.NoOfAbsences;
+                        progressEle.css("background", "#4a77d4");
+                        progressEle.width((100/total) * percent + "%")
+                    document.getElementById("job-status").innerText = `${percent}`;
+                }
+            });
+        connection.start()
+            .then(_ => connection.invoke("AssociateJob", "@Model.AbsencesCreated"))
+            .catch(err => console.error(err.toString()));
+        </script>
+    }
+</body>
+</html>
